@@ -57,4 +57,4 @@ Expo 55 · React Native 0.83 · Reanimated 4 · Skia · Expo Router
 ---
 
 > [!WARNING]
-> This project is **not optimized** — it needs performance improvements and currently **only works on Android**. iOS is not supported yet.
+> This project is **not optimized** — it needs performance improvements and currently **only works on Android**. iOS is not supported yet (c'mon use the native date picker for iOS).

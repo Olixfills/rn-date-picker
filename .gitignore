@@ -40,6 +40,8 @@ yarn-error.*
 
 app-example
 bun.lock
+.swp
+
 
 # generated native folders
 /ios
