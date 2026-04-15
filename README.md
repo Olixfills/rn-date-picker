@@ -1,56 +1,60 @@
-# Welcome to your Expo app 👋
+# expo-ios-like-date-picker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A pretty date picker that looks and feels like the one on iOS but for Android.
 
-## Get started
+## ✨ Features
 
-1. Install dependencies
+- 🎡 Wheel picker with haptic feedback & sound
+- 📅 Calendar grid for day selection
+- 🔮 Glassmorphism & smooth animations
+- 🧩 TypeScript-ready
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## ⚙️ Installation
 
 ```bash
-npm run reset-project
+git clone https://github.com/rit3zh/expo-ios-like-date-picker
+cd expo-ios-like-date-picker
+bun start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-### Other setup steps
+## 🎥 Preview
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+<!-- TODO: add video -->
 
-## Learn more
+https://github.com/user-attachments/assets/PLACEHOLDER
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 🚀 Usage
 
-## Join the community
+```tsx
+import { DatePickerDropdown, type DateValue } from "@/src";
 
-Join our community of developers creating universal apps.
+const [date, setDate] = useState<DateValue>({
+  day: 15,
+  month: 3,
+  year: 2026,
+});
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+<DatePickerDropdown.Root value={date} onChange={setDate}>
+  <DatePickerDropdown.Trigger style={styles.trigger}>
+    <Text>Pick a date</Text>
+  </DatePickerDropdown.Trigger>
+  <DatePickerDropdown.Content side="bottom" align="center" />
+</DatePickerDropdown.Root>;
+```
+
+---
+
+## Stack
+
+Expo 55 · React Native 0.83 · Reanimated 4 · Skia · Expo Router
+
+---
+
+> [!WARNING]
+> This project is **not optimized** — it needs performance improvements and currently **only works on Android**. iOS is not supported yet.

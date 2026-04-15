@@ -8,6 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.claude/
+.vscode/
 
 # Native
 .kotlin/
@@ -37,6 +39,7 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+bun.lock
 
 # generated native folders
 /ios
