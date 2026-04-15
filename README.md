@@ -1,3 +1,4 @@
+
 # expo-ios-like-date-picker
 
 A pretty date picker that looks and feels like the one on iOS but for Android.
@@ -25,7 +26,7 @@ bun start
 
 <!-- TODO: add video -->
 
-https://github.com/user-attachments/assets/PLACEHOLDER
+https://github.com/user-attachments/assets/ed77e2f1-ceff-4ae5-afdf-3f40b2fbb9df
 
 ---
 
