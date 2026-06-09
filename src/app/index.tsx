@@ -1,216 +1,151 @@
-import type { DateValue } from "@/context";
-import { DatePickerDropdown } from "@/dropdown";
-import { toDateValue } from "@/helpers";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState, useMemo } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { DatePickerDropdown, formatDateTime } from "@/index";
+import type { DateValue } from "@/index";
 
 const FONT = "SfProRounded";
 
-const PICKUP_LOCATION = "SFO International Airport";
-const DROPOFF_LOCATION = "Union Square, SF";
-
-function formatShortDate(d: DateValue) {
-  const dd = String(d.day).padStart(2, "0");
-  const mm = String(d.month + 1).padStart(2, "0");
-  const yy = String(d.year).slice(-2);
-  return `${dd}/${mm}/${yy}`;
-}
-
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-
-function Chip({ icon, label }: { icon?: IoniconName; label: string }) {
-  return (
-    <View style={styles.chip}>
-      {icon ?
-        <Ionicons
-          name={icon}
-          size={13}
-          color="rgba(255,255,255,0.7)"
-          style={{ marginRight: 6 }}
-        />
-      : null}
-      <Text style={styles.chipText}>{label}</Text>
-    </View>
-  );
-}
-
 export default function Index() {
-  const today = new Date();
-  const [fromDate, setFromDate] = useState<DateValue>(toDateValue(today));
-  const [toDate, setToDate] = useState<DateValue>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return toDateValue(d);
-  });
+  const today = useMemo(() => new Date(), []);
+  const initialValue = useMemo<DateValue>(() => ({
+    day: today.getDate(),
+    month: today.getMonth(),
+    year: today.getFullYear(),
+    hour: today.getHours(),
+    minute: today.getMinutes(),
+  }), [today]);
 
-  const fromLabel = useMemo(() => formatShortDate(fromDate), [fromDate]);
-  const toLabel = useMemo(() => formatShortDate(toDate), [toDate]);
+  // States for different usage examples
+  const [dateOnly, setDateOnly] = useState<DateValue>(initialValue);
+  const [time12, setTime12] = useState<DateValue>(initialValue);
+  const [time24, setTime24] = useState<DateValue>(initialValue);
+  const [dateTime12, setDateTime12] = useState<DateValue>(initialValue);
+  const [dateTime24, setDateTime24] = useState<DateValue>(initialValue);
+  const [clampedVal, setClampedDate] = useState<DateValue>(initialValue);
+
+  // Boundary limits for clamped example (clamped between today and +5 days, hours 08:00 to 20:00)
+  const maxD = useMemo(() => {
+    const d = new Date();
+    d.setDate(today.getDate() + 5);
+    return d;
+  }, [today]);
+
+  const minDateLimit = initialValue;
+  const maxDateLimit = useMemo<DateValue>(() => ({
+    day: maxD.getDate(),
+    month: maxD.getMonth(),
+    year: maxD.getFullYear(),
+    hour: 20,
+    minute: 0,
+  }), [maxD]);
+
+  const minTimeLimit = { hour: 8, minute: 0 };
+  const maxTimeLimit = { hour: 20, minute: 0 };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.headerRow}>
-          <View style={styles.avatar}>
-            <Image
-              source={{
-                uri: "https://i.pinimg.com/1200x/18/78/37/18783753f9ec9084a25a731580357b84.jpg",
-              }}
-              style={{ height: "100%", width: "100%" }}
-            />
-          </View>
-
-          <View style={styles.searchPill}>
-            <Feather name="search" size={18} color="#b8b8b8" />
-            <Text style={styles.searchPlaceholder}>Find </Text>
-            <Text style={styles.searchHighlight}>Best Car</Text>
-          </View>
-
-          <Pressable style={styles.bellButton} hitSlop={8}>
-            <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
-            <View style={styles.bellDot} />
-          </Pressable>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Date & Time Pickers</Text>
+          <Text style={styles.subtitle}>iOS-Styled Component Showcase</Text>
         </View>
 
-        <Text style={styles.title}>Search for a car</Text>
-        <Text style={styles.subtitle}>
-          Find car hire at over 32K+ locations
-        </Text>
-
-        <View style={styles.inputField}>
-          <View style={styles.markerDotFilled} />
-          <Text style={styles.inputValue} numberOfLines={1}>
-            {PICKUP_LOCATION}
-          </Text>
-          <Ionicons name="location-outline" size={20} color="#FFFFFF" />
-        </View>
-
-        <View style={styles.inputField}>
-          <View style={styles.markerDotHollow} />
-          <Text style={styles.inputValue} numberOfLines={1}>
-            {DROPOFF_LOCATION}
-          </Text>
-          <Ionicons name="location-outline" size={20} color="#FFFFFF" />
-        </View>
-
-        <View style={styles.dateCard}>
-          <View style={styles.dateCol}>
-            <DatePickerDropdown.Root onChange={setFromDate} value={fromDate}>
-              <DatePickerDropdown.Trigger style={styles.dateTrigger}>
-                <Text style={styles.dateLabel}>From</Text>
-                <View style={styles.dateValueRow}>
-                  <Text style={styles.dateValue}>{fromLabel}</Text>
-                  <Text style={styles.timeValue}>10:00</Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={12}
-                    color="rgba(255,255,255,0.5)"
-                    style={{ marginLeft: 2 }}
-                  />
-                </View>
-              </DatePickerDropdown.Trigger>
-              <DatePickerDropdown.Content side="bottom" />
-            </DatePickerDropdown.Root>
-          </View>
-
-          <View style={styles.swapButton}>
-            <Ionicons
-              name="swap-horizontal"
-              size={16}
-              color="rgba(255,255,255,0.8)"
-            />
-          </View>
-
-          <View style={[styles.dateCol, { alignItems: "flex-end" }]}>
-            <DatePickerDropdown.Root onChange={setToDate} value={toDate}>
-              <DatePickerDropdown.Trigger style={styles.dateTrigger}>
-                <Text style={styles.dateLabel}>To</Text>
-                <View style={styles.dateValueRow}>
-                  <Text style={styles.dateValue}>{toLabel}</Text>
-                  <Text style={styles.timeValue}>10:00</Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={12}
-                    color="rgba(255,255,255,0.5)"
-                    style={{ marginLeft: 2 }}
-                  />
-                </View>
-              </DatePickerDropdown.Trigger>
-              <DatePickerDropdown.Content side="bottom" />
-            </DatePickerDropdown.Root>
-          </View>
-        </View>
-
-        <View style={styles.ageRow}>
-          <Text style={styles.ageText}>Driver&apos;s Age 30-55</Text>
-          <Pressable hitSlop={8}>
-            <Text style={styles.changeLink}>Change</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.searchButton,
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          <Text style={styles.searchButtonText}>Search</Text>
-        </Pressable>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Most Popular Car</Text>
-          <Pressable hitSlop={8}>
-            <Text style={styles.seeAll}>See all</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.carCard}>
-          <View style={styles.carBanner}>
-            <View style={styles.carBannerLeft}>
-              <Ionicons name="location" size={13} color="#2F4D1E" />
-              <Text style={styles.carBannerText}>
-                <Text style={styles.carBannerBold}>200 m</Text> Nearest to you
-              </Text>
-            </View>
-            <Pressable style={styles.carBannerRight} hitSlop={6}>
-              <Text style={styles.carBannerDetail}>Detail</Text>
-              <Ionicons name="chevron-forward" size={13} color="#2F4D1E" />
-            </Pressable>
-          </View>
-
-          <View style={styles.carImageStage}>
-            <Image
-              source={require("@/assets/vehicle/tesla.png")}
-              style={styles.carImage}
-              contentFit="contain"
-            />
-          </View>
-
-          <View style={styles.carInfoRow}>
-            <View>
-              <Text style={styles.carBrand}>Tesla</Text>
-              <Text style={styles.carModelName}>Model 3</Text>
-            </View>
-            <View style={{ alignItems: "flex-end" }}>
-              <View style={styles.carPriceRow}>
-                <Text style={styles.carPrice}>$85</Text>
-                <Text style={styles.carPriceUnit}>/day</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Basic Examples</Text>
+          <View style={styles.card}>
+            {/* 1. Date Only Mode */}
+            <View style={styles.row}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Date Only</Text>
+                <Text style={styles.rowValue}>{formatDateTime(dateOnly, "DD MMMM YYYY")}</Text>
               </View>
+              <DatePickerDropdown.Root onChange={setDateOnly} value={dateOnly} mode="date">
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="bottom" />
+              </DatePickerDropdown.Root>
+            </View>
+
+            {/* 2. Standalone 12-Hour Time */}
+            <View style={styles.row}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Time (12-Hour AM/PM)</Text>
+                <Text style={styles.rowValue}>{formatDateTime(time12, "hh:mm A")}</Text>
+              </View>
+              <DatePickerDropdown.Root onChange={setTime12} value={time12} mode="time" is24Hour={false}>
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="bottom" />
+              </DatePickerDropdown.Root>
+            </View>
+
+            {/* 3. Standalone 24-Hour Time */}
+            <View style={[styles.row, styles.lastRow]}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Time (24-Hour)</Text>
+                <Text style={styles.rowValue}>{formatDateTime(time24, "HH:mm")}</Text>
+              </View>
+              <DatePickerDropdown.Root onChange={setTime24} value={time24} mode="time" is24Hour={true}>
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="bottom" />
+              </DatePickerDropdown.Root>
             </View>
           </View>
+        </View>
 
-          <View style={styles.chipsWrap}>
-            <Chip icon="speedometer-outline" label="250 kmh" />
-            <Chip icon="cog-outline" label="Automatic" />
-            <Chip icon="flash-outline" label="Electric" />
-            <Chip icon="people-outline" label="5 Seats" />
-            <Chip icon="car-sport-outline" label="Sedan" />
-            <Chip label="+2 Etc" />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Combined Datetime Examples</Text>
+          <View style={styles.card}>
+            {/* 4. Combined 12-Hour Datetime */}
+            <View style={styles.row}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Datetime (12-Hour)</Text>
+                <Text style={styles.rowValue}>{formatDateTime(dateTime12, "DD/MM/YY, hh:mm A")}</Text>
+              </View>
+              <DatePickerDropdown.Root onChange={setDateTime12} value={dateTime12} mode="datetime" is24Hour={false}>
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="bottom" />
+              </DatePickerDropdown.Root>
+            </View>
+
+            {/* 5. Combined 24-Hour Datetime */}
+            <View style={[styles.row, styles.lastRow]}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Datetime (24-Hour)</Text>
+                <Text style={styles.rowValue}>{formatDateTime(dateTime24, "YYYY-MM-DD HH:mm")}</Text>
+              </View>
+              <DatePickerDropdown.Root onChange={setDateTime24} value={dateTime24} mode="datetime" is24Hour={true}>
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="bottom" />
+              </DatePickerDropdown.Root>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Boundary Controls & Limits</Text>
+          <View style={styles.card}>
+            {/* 6. Clamped Datetime Picker */}
+            <View style={[styles.row, styles.lastRow]}>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Clamped Picker</Text>
+                <Text style={styles.rowValue}>{formatDateTime(clampedVal, "DD/MM/YY, hh:mm A")}</Text>
+                <Text style={styles.rowCaption}>Limited between today and +5 days, hours 08:00 to 20:00</Text>
+              </View>
+              <DatePickerDropdown.Root
+                onChange={setClampedDate}
+                value={clampedVal}
+                minDate={minDateLimit}
+                maxDate={maxDateLimit}
+                minTime={minTimeLimit}
+                maxTime={maxTimeLimit}
+                mode="datetime"
+                is24Hour={false}
+              >
+                <DatePickerDropdown.Trigger />
+                <DatePickerDropdown.Content side="top" />
+              </DatePickerDropdown.Root>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -219,16 +154,10 @@ export default function Index() {
 }
 
 const BG = "#000000";
-const CARD_BG = "#141417";
-const CAR_CARD_BG = "#17181B";
-const IMAGE_STAGE_BG = "#1E2024";
+const CARD_BG = "#1C1C1E";
 const TEXT_PRIMARY = "#FFFFFF";
-const TEXT_SECONDARY = "rgba(255,255,255,0.55)";
-const TEXT_TERTIARY = "rgba(255,255,255,0.35)";
+const TEXT_SECONDARY = "rgba(255,255,255,0.6)";
 const BORDER_SUBTLE = "rgba(255,255,255,0.06)";
-const LINK_BLUE = "#4A8CFF";
-const SEARCH_GREEN = "#D9EE8B";
-const DARK_GREEN_TEXT = "#2F4D1E";
 
 const styles = StyleSheet.create({
   safe: {
@@ -237,347 +166,78 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 48,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-  },
-  headerRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 20,
-    marginBottom: 24,
-    marginTop: 4,
-  },
-  avatar: {
-    alignItems: "center",
-    backgroundColor: CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    overflow: "hidden",
-    width: 44,
-  },
-  searchPill: {
-    alignItems: "center",
-    backgroundColor: CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 26,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: "row",
-    height: 46,
     paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  searchPlaceholder: {
-    color: TEXT_SECONDARY,
-    fontFamily: FONT,
-    fontSize: 15,
-    marginLeft: 14,
-  },
-  searchHighlight: {
-    color: TEXT_PRIMARY,
-    fontFamily: FONT,
-    fontSize: 15,
-  },
-  bellButton: {
-    alignItems: "center",
-    backgroundColor: CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  bellDot: {
-    backgroundColor: "#FF453A",
-    borderColor: CARD_BG,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    height: 9,
-    position: "absolute",
-    right: 11,
-    top: 11,
-    width: 9,
+  header: {
+    marginBottom: 24,
+    marginTop: 8,
   },
   title: {
     color: TEXT_PRIMARY,
     fontFamily: FONT,
-    fontSize: 26,
+    fontSize: 28,
+    fontWeight: "700",
     letterSpacing: -0.6,
-    marginTop: 4,
   },
   subtitle: {
     color: TEXT_SECONDARY,
     fontFamily: FONT,
     fontSize: 15,
-    marginBottom: 22,
-    marginTop: 6,
+    marginTop: 4,
   },
-  inputField: {
-    alignItems: "center",
-    backgroundColor: CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    height: 60,
-    marginBottom: 12,
-    paddingHorizontal: 18,
-  },
-  markerDotFilled: {
-    backgroundColor: "#7CD17B",
-    borderRadius: 5,
-    height: 10,
-    width: 10,
-  },
-  markerDotHollow: {
-    borderColor: "#FF6A5B",
-    borderRadius: 5,
-    borderWidth: 2,
-    height: 10,
-    width: 10,
-  },
-  inputValue: {
-    color: TEXT_PRIMARY,
-    flex: 1,
-    fontFamily: FONT,
-    fontSize: 15,
-    fontWeight: "500",
-    letterSpacing: -0.2,
-  },
-  dateCard: {
-    alignItems: "center",
-    backgroundColor: CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: "row",
-    height: 78,
-    marginTop: 2,
-    paddingHorizontal: 18,
-  },
-  dateCol: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  dateTrigger: {
-    alignItems: "flex-start",
-  },
-  dateLabel: {
-    color: TEXT_TERTIARY,
-    fontFamily: FONT,
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  dateValueRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  dateValue: {
-    color: TEXT_PRIMARY,
-    fontFamily: FONT,
-    fontSize: 15,
-    fontWeight: "600",
-    letterSpacing: -0.2,
-  },
-  timeValue: {
-    color: TEXT_PRIMARY,
-    fontFamily: FONT,
-    fontSize: 15,
-    fontWeight: "500",
-    letterSpacing: -0.2,
-  },
-  swapButton: {
-    alignItems: "center",
-    backgroundColor: "#1F2024",
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    marginHorizontal: 8,
-    width: 36,
-    top: 10,
-    right: 5,
-  },
-  ageRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
-  },
-  ageText: {
-    color: "rgba(255,255,255,0.7)",
-    fontFamily: FONT,
-    fontSize: 14,
-  },
-  changeLink: {
-    color: LINK_BLUE,
-    fontFamily: FONT,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  searchButton: {
-    alignItems: "center",
-    backgroundColor: SEARCH_GREEN,
-    borderRadius: 22,
-    height: 52,
-    justifyContent: "center",
-    marginTop: 22,
-    shadowColor: "#8FBD2A",
-    shadowOffset: { height: 10, width: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 6,
-  },
-  searchButtonText: {
-    color: DARK_GREEN_TEXT,
-    fontFamily: FONT,
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: -0.2,
-  },
-  sectionHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 32,
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
-    color: TEXT_PRIMARY,
-    fontFamily: FONT,
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-  seeAll: {
     color: TEXT_SECONDARY,
-    fontFamily: FONT,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  carCard: {
-    backgroundColor: CAR_CARD_BG,
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 26,
-    borderWidth: 1,
-    marginTop: 14,
-    overflow: "hidden",
-    padding: 14,
-  },
-  carBanner: {
-    alignItems: "center",
-    backgroundColor: SEARCH_GREEN,
-    borderRadius: 14,
-    flexDirection: "row",
-    height: 42,
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-  },
-  carBannerLeft: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-  },
-  carBannerText: {
-    color: DARK_GREEN_TEXT,
-    fontFamily: FONT,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  carBannerBold: {
-    fontFamily: FONT,
-    fontWeight: "700",
-  },
-  carBannerRight: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 2,
-  },
-  carBannerDetail: {
-    color: DARK_GREEN_TEXT,
     fontFamily: FONT,
     fontSize: 13,
     fontWeight: "600",
+    letterSpacing: 0.4,
+    marginBottom: 8,
+    marginLeft: 4,
+    textTransform: "uppercase",
   },
-  carImageStage: {
-    alignItems: "center",
-    backgroundColor: IMAGE_STAGE_BG,
-    borderRadius: 18,
-    height: 168,
-    justifyContent: "center",
-    marginTop: 10,
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER_SUBTLE,
     overflow: "hidden",
   },
-  carImage: {
-    height: "100%",
-    width: "80%",
-  },
-  carInfoRow: {
-    alignItems: "flex-end",
+  row: {
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: BORDER_SUBTLE,
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 14,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  carBrand: {
-    color: TEXT_SECONDARY,
-    fontFamily: FONT,
-    fontSize: 13,
-    fontWeight: "500",
+  lastRow: {
+    borderBottomWidth: 0,
   },
-  carModelName: {
+  rowInfo: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  rowLabel: {
     color: TEXT_PRIMARY,
     fontFamily: FONT,
-    fontSize: 22,
-    fontWeight: "700",
-    letterSpacing: -0.5,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  rowValue: {
+    color: "#0a97fd",
+    fontFamily: FONT,
+    fontSize: 14,
     marginTop: 2,
   },
-  carPriceRow: {
-    alignItems: "baseline",
-    flexDirection: "row",
-  },
-  carPrice: {
-    color: TEXT_PRIMARY,
+  rowCaption: {
+    color: "rgba(255,255,255,0.35)",
     fontFamily: FONT,
-    fontSize: 22,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  carPriceUnit: {
-    color: TEXT_SECONDARY,
-    fontFamily: FONT,
-    fontSize: 13,
-    fontWeight: "500",
-    marginLeft: 2,
-  },
-  chipsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
-    paddingHorizontal: 2,
-  },
-  chip: {
-    alignItems: "center",
-    backgroundColor: "#1E2024",
-    borderColor: BORDER_SUBTLE,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    height: 34,
-    paddingHorizontal: 12,
-  },
-  chipText: {
-    color: "rgba(255,255,255,0.85)",
-    fontFamily: FONT,
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: -0.1,
+    fontSize: 11,
+    marginTop: 4,
   },
 });

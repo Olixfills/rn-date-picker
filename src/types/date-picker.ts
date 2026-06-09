@@ -6,7 +6,11 @@ interface DateValue {
   day: number;
   month: number;
   year: number;
+  hour?: number;
+  minute?: number;
 }
+
+type DateTimeValue = DateValue;
 
 interface TriggerRect {
   x: number;
@@ -23,6 +27,12 @@ interface DatePickerContextValue {
   toggle: () => void;
   minYear: number;
   maxYear: number;
+  minDate?: DateValue;
+  maxDate?: DateValue;
+  minTime?: { hour: number; minute: number };
+  maxTime?: { hour: number; minute: number };
+  mode: "date" | "time" | "datetime";
+  is24Hour: boolean;
   triggerRef: RefObject<View | null>;
   triggerRect: TriggerRect | null;
   measureTrigger: (onMeasured?: (rect: TriggerRect) => void) => void;
@@ -34,6 +44,12 @@ interface DatePickerRootProps {
   defaultOpen?: boolean;
   maxYear?: number;
   minYear?: number;
+  minDate?: DateValue;
+  maxDate?: DateValue;
+  minTime?: { hour: number; minute: number };
+  maxTime?: { hour: number; minute: number };
+  mode?: "date" | "time" | "datetime";
+  is24Hour?: boolean;
   onChange?: (value: DateValue) => void;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;

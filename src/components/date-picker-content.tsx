@@ -72,6 +72,65 @@ import {
 import { MonthPage } from "./month-page";
 import { WheelPicker } from "./wheel-picker";
 
+const SegmentedControl = memo(({
+  values,
+  selectedIndex,
+  onChange,
+  fontLoaded,
+}: {
+  values: string[];
+  selectedIndex: number;
+  onChange: (index: number) => void;
+  fontLoaded: boolean;
+}) => {
+  const progress = useSharedValue(selectedIndex);
+
+  useEffect(() => {
+    progress.value = withSpring(selectedIndex, { damping: 20, stiffness: 220 });
+  }, [selectedIndex]);
+
+  const indicatorStyle = useAnimatedStyle(() => {
+    const widthPercent = 100 / values.length;
+    return {
+      width: `${widthPercent}%`,
+      left: `${progress.value * widthPercent}%`,
+    };
+  });
+
+  return (
+    <View style={styles.segmentedContainer}>
+      <Animated.View style={[styles.segmentedIndicator, indicatorStyle]} />
+      {values.map((val, idx) => (
+        <Pressable
+          key={val}
+          onPress={() => onChange(idx)}
+          style={styles.segmentedSegment}
+        >
+          <Text
+            style={[
+              styles.segmentedText,
+              fontLoaded && { fontFamily: "SfProRounded" },
+              selectedIndex === idx && styles.segmentedTextActive,
+            ]}
+          >
+            {val}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+});
+
+SegmentedControl.displayName = "SegmentedControl";
+
+function get24HourFrom12Hour(hour12: number, ampm: "AM" | "PM"): number {
+  if (ampm === "PM") {
+    return hour12 === 12 ? 12 : hour12 + 12;
+  } else {
+    return hour12 === 12 ? 0 : hour12;
+  }
+}
+
 export const DatePickerContent = memo<DatePickerContentProps>(
   ({
     align = "center",
@@ -90,6 +149,12 @@ export const DatePickerContent = memo<DatePickerContentProps>(
       setValue,
       triggerRect,
       value,
+      minDate,
+      maxDate,
+      minTime,
+      maxTime,
+      mode: pickerMode,
+      is24Hour,
     } = useDatePickerContext();
     const [fontLoaded] = useFonts({
       SfProRounded: require("@/assets/fonts/sf-pro-rounded.otf"),
@@ -103,14 +168,16 @@ export const DatePickerContent = memo<DatePickerContentProps>(
     const [monthWheelIndex, setMonthWheelIndex] = useState(
       MONTH_LOOP_MIDDLE * MONTHS.length + value.month,
     );
-    const [mode, setMode] = useState<DatePickerContentMode>("calendar");
+    const [dateViewMode, setDateViewMode] = useState<DatePickerContentMode>("calendar");
+    const [activeTab, setActiveTab] = useState<"date" | "time">("date");
+    const currentTab = pickerMode === "time" ? "time" : (pickerMode === "date" ? "date" : activeTab);
     const [calendarPageWidth, setCalendarPageWidth] =
       useState(PANEL_INNER_WIDTH);
 
     const progress = useSharedValue(0);
     const modeProgress = useSharedValue(0);
-    const calendarRef = useRef<FlatList<number>>(null);
-    const previousModeRef = useRef(mode);
+    const tabProgress = useSharedValue(pickerMode === "time" ? 1 : 0);
+
     const window = useWindowDimensions();
 
     const yearItems = useMemo(
@@ -119,18 +186,6 @@ export const DatePickerContent = memo<DatePickerContentProps>(
           String(minYear + index),
         ),
       [maxYear, minYear],
-    );
-    const monthCount = useMemo(
-      () => (maxYear - minYear + 1) * 12,
-      [maxYear, minYear],
-    );
-    const monthIndexes = useMemo(
-      () => Array.from({ length: monthCount }, (_, index) => index),
-      [monthCount],
-    );
-    const viewIndex = useMemo(
-      () => monthToIndex(viewYear, viewMonth, minYear),
-      [minYear, viewMonth, viewYear],
     );
     const calendarColumnWidth = calendarPageWidth / 7;
     const stageHeight = computeStageHeight(MAX_CALENDAR_ROWS);
@@ -173,8 +228,8 @@ export const DatePickerContent = memo<DatePickerContentProps>(
       "rgba(28,28,30,0.72)",
       "rgba(28,28,30,0.94)",
     ];
-    const canGoPrev = viewIndex > 0;
-    const canGoNext = viewIndex < monthCount - 1;
+    const canGoPrev = viewYear > minYear || viewMonth > 0;
+    const canGoNext = viewYear < maxYear || viewMonth < 11;
 
     const position = useMemo(() => {
       if (!triggerRect) {
@@ -226,17 +281,16 @@ export const DatePickerContent = memo<DatePickerContentProps>(
       setViewMonth(value.month);
       setViewYear(value.year);
       setMonthWheelIndex(MONTH_LOOP_MIDDLE * MONTHS.length + value.month);
-      setMode("calendar");
-      previousModeRef.current = "calendar";
+      setDateViewMode("calendar");
       progress.value = 0;
       modeProgress.value = 0;
     }, [measureTrigger, modeProgress, open, progress, value.month, value.year]);
 
     useEffect(() => {
-      if (mode === "wheel") return;
+      if (dateViewMode === "wheel") return;
 
       setMonthWheelIndex(MONTH_LOOP_MIDDLE * MONTHS.length + viewMonth);
-    }, [mode, viewMonth]);
+    }, [dateViewMode, viewMonth]);
 
     useEffect(() => {
       if (!open) return;
@@ -301,6 +355,16 @@ export const DatePickerContent = memo<DatePickerContentProps>(
       opacity: 1 - modeProgress.value,
     }));
 
+    const dateTabStyle = useAnimatedStyle(() => ({
+      opacity: interpolate(tabProgress.value, [0, 1], [1, 0]),
+      transform: [{ scale: interpolate(tabProgress.value, [0, 1], [1, 0.94]) }],
+    }));
+
+    const timeTabStyle = useAnimatedStyle(() => ({
+      opacity: interpolate(tabProgress.value, [0, 1], [0, 1]),
+      transform: [{ scale: interpolate(tabProgress.value, [0, 1], [0.94, 1]) }],
+    }));
+
     const monthChevronAnimatedStyle = useAnimatedStyle(() => ({
       transform: [
         { rotate: `${modeProgress.value * 90}deg` },
@@ -317,150 +381,59 @@ export const DatePickerContent = memo<DatePickerContentProps>(
     }));
 
     useEffect(() => {
+      if (pickerMode === "time") {
+        tabProgress.value = 1;
+      } else if (pickerMode === "date") {
+        tabProgress.value = 0;
+      } else {
+        tabProgress.value = withSpring(activeTab === "time" ? 1 : 0, {
+          damping: 20,
+          stiffness: 220,
+        });
+      }
+    }, [activeTab, pickerMode, tabProgress]);
+
+    useEffect(() => {
       wheelSoundPlayer.loop = false;
       wheelSoundPlayer.volume = 0.16;
     }, [wheelSoundPlayer]);
 
     const toggleMode = useCallback(() => {
-      const nextMode = mode === "calendar" ? "wheel" : "calendar";
-      setMode(nextMode);
+      const nextMode = dateViewMode === "calendar" ? "wheel" : "calendar";
+      setDateViewMode(nextMode);
       modeProgress.value = withTiming(nextMode === "wheel" ? 1 : 0, {
         duration: 260,
         easing: Easing.bezier(0.22, 1, 0.36, 1),
       });
-    }, [mode, modeProgress]);
-
-    const syncCalendar = useCallback((index: number, animated: boolean) => {
-      requestAnimationFrame(() => {
-        calendarRef.current?.scrollToIndex({ animated, index });
-      });
-    }, []);
-
-    const resolveCalendarIndex = useCallback(
-      (offsetX: number) =>
-        clampIndex(Math.round(offsetX / calendarPageWidth), monthCount),
-      [calendarPageWidth, monthCount],
-    );
-
-    useEffect(() => {
-      if (!mounted) return;
-
-      if (previousModeRef.current !== "calendar" && mode === "calendar") {
-        syncCalendar(viewIndex, false);
-      }
-
-      previousModeRef.current = mode;
-    }, [mode, mounted, syncCalendar, viewIndex]);
+    }, [dateViewMode, modeProgress]);
 
     const handleSelectDay = useCallback(
       (day: number, month: number, year: number) => {
-        setValue({ day, month, year });
+        setValue({ ...value, day, month, year });
         requestClose();
       },
-      [requestClose, setValue],
-    );
-
-    const setViewFromIndex = useCallback(
-      (index: number) => {
-        const clamped = clampIndex(index, monthCount);
-        const target = indexToMonth(clamped, minYear);
-        setViewMonth(target.month);
-        setViewYear(target.year);
-      },
-      [minYear, monthCount],
-    );
-
-    const handleCalendarMomentumEnd = useCallback(
-      (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const nextIndex = resolveCalendarIndex(
-          event.nativeEvent.contentOffset.x,
-        );
-        setViewFromIndex(nextIndex);
-      },
-      [resolveCalendarIndex, setViewFromIndex],
-    );
-
-    const handleCalendarScrollEndDrag = useCallback(
-      (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const targetOffset = event.nativeEvent.targetContentOffset?.x;
-        if (typeof targetOffset !== "number") return;
-
-        setViewFromIndex(resolveCalendarIndex(targetOffset));
-      },
-      [resolveCalendarIndex, setViewFromIndex],
-    );
-
-    const handleScrollToIndexFailed = useCallback(
-      ({ index }: { index: number }) => {
-        requestAnimationFrame(() => {
-          calendarRef.current?.scrollToOffset({
-            animated: false,
-            offset: index * calendarPageWidth,
-          });
-        });
-      },
-      [calendarPageWidth],
-    );
-
-    const handleCalendarLayout = useCallback(
-      (event: LayoutChangeEvent) => {
-        const nextWidth = event.nativeEvent.layout.width;
-        if (nextWidth <= 0) return;
-        if (Math.abs(nextWidth - calendarPageWidth) < 0.5) return;
-
-        setCalendarPageWidth(nextWidth);
-
-        if (!mounted || mode !== "calendar") return;
-
-        requestAnimationFrame(() => {
-          calendarRef.current?.scrollToOffset({
-            animated: false,
-            offset: viewIndex * nextWidth,
-          });
-        });
-      },
-      [calendarPageWidth, mode, mounted, viewIndex],
+      [requestClose, setValue, value],
     );
 
     const moveByMonth = useCallback(
       (delta: number) => {
-        const nextIndex = clampIndex(viewIndex + delta, monthCount);
-        if (nextIndex === viewIndex) return;
+        let nextMonth = viewMonth + delta;
+        let nextYear = viewYear;
+        if (nextMonth < 0) {
+          nextMonth = 11;
+          nextYear -= 1;
+        } else if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear += 1;
+        }
 
-        setViewFromIndex(nextIndex);
-        syncCalendar(nextIndex, true);
+        // Clamp to minYear and maxYear
+        if (nextYear < minYear || nextYear > maxYear) return;
+
+        setViewMonth(nextMonth);
+        setViewYear(nextYear);
       },
-      [monthCount, setViewFromIndex, syncCalendar, viewIndex],
-    );
-
-    const renderMonthItem = useCallback(
-      ({ item }: { item: number }) => {
-        const target = indexToMonth(item, minYear);
-        const selectedDay =
-          value.month === target.month && value.year === target.year ?
-            value.day
-          : null;
-
-        return (
-          <MonthPage
-            fontFamily={fontLoaded ? "SfProRounded" : undefined}
-            month={target.month}
-            onSelect={handleSelectDay}
-            pageWidth={calendarPageWidth}
-            selectedDay={selectedDay}
-            year={target.year}
-          />
-        );
-      },
-      [
-        calendarPageWidth,
-        handleSelectDay,
-        fontLoaded,
-        minYear,
-        value.day,
-        value.month,
-        value.year,
-      ],
+      [viewMonth, viewYear, minYear, maxYear],
     );
 
     const playWheelTick = useCallback(() => {
@@ -501,6 +474,75 @@ export const DatePickerContent = memo<DatePickerContentProps>(
       [minYear, playWheelTick],
     );
 
+    // --- Time Selection Helpers ---
+    const hours = useMemo(() => {
+      if (is24Hour) {
+        return Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+      } else {
+        return Array.from({ length: 12 }, (_, i) => String(i === 0 ? 12 : i).padStart(2, "0"));
+      }
+    }, [is24Hour]);
+
+    const minutesList = useMemo(() => {
+      return Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+    }, []);
+
+    const ampms = useMemo(() => ["AM", "PM"], []);
+
+    const selectedHourIndex = useMemo(() => {
+      const hr = value.hour ?? 10;
+      if (is24Hour) {
+        return Math.max(0, Math.min(hr, 23));
+      } else {
+        const displayHour = hr % 12 === 0 ? 12 : hr % 12;
+        return displayHour - 1;
+      }
+    }, [value.hour, is24Hour]);
+
+    const selectedMinuteIndex = useMemo(() => {
+      return Math.max(0, Math.min(value.minute ?? 0, 59));
+    }, [value.minute]);
+
+    const selectedAmpmIndex = useMemo(() => {
+      const hr = value.hour ?? 10;
+      return hr >= 12 ? 1 : 0;
+    }, [value.hour]);
+
+    const handleHourChange = useCallback((index: number) => {
+      let targetHour = 10;
+      if (is24Hour) {
+        targetHour = index;
+      } else {
+        const displayHour = index + 1;
+        const isPm = (value.hour ?? 10) >= 12;
+        targetHour = get24HourFrom12Hour(displayHour, isPm ? "PM" : "AM");
+      }
+      startTransition(() => {
+        playWheelTick();
+        setValue({ ...value, hour: targetHour });
+      });
+    }, [value, is24Hour, setValue, playWheelTick]);
+
+    const handleMinuteChange = useCallback((index: number) => {
+      startTransition(() => {
+        playWheelTick();
+        setValue({ ...value, minute: index });
+      });
+    }, [value, setValue, playWheelTick]);
+
+    const handleAmpmChange = useCallback((index: number) => {
+      const targetAmpm = index === 1 ? "PM" : "AM";
+      const hr = value.hour ?? 10;
+      const hour12 = hr % 12 === 0 ? 12 : hr % 12;
+      const targetHour = get24HourFrom12Hour(hour12, targetAmpm);
+      startTransition(() => {
+        playWheelTick();
+        setValue({ ...value, hour: targetHour });
+      });
+    }, [value, setValue, playWheelTick]);
+
+    const timeColumnWidth = is24Hour ? wheelViewportWidth / 2 : wheelViewportWidth / 3;
+
     return (
       <Modal
         animationType="none"
@@ -517,7 +559,7 @@ export const DatePickerContent = memo<DatePickerContentProps>(
             style={[
               styles.panelAnchor,
               {
-                height: panelHeight,
+                height: panelHeight + (pickerMode === "datetime" ? 48 : 0),
                 left: position.x,
                 top: position.y,
                 transformOrigin,
@@ -538,77 +580,98 @@ export const DatePickerContent = memo<DatePickerContentProps>(
                 ]}
               >
                 <View style={[styles.header, { height: HEADER_HEIGHT }]}>
-                  <Pressable
-                    hitSlop={6}
-                    onPress={toggleMode}
-                    style={({ pressed }) => [
-                      styles.monthLabelButton,
-                      pressed && styles.triggerPressed,
-                    ]}
-                  >
-                    <Animated.Text
+                  {currentTab === "date" ? (
+                    <Pressable
+                      hitSlop={6}
+                      onPress={toggleMode}
+                      style={({ pressed }) => [
+                        styles.monthLabelButton,
+                        pressed && styles.triggerPressed,
+                      ]}
+                    >
+                      <Animated.Text
+                        style={[
+                          styles.monthLabel,
+                          textStylez,
+                          {
+                            fontFamily: fontLoaded ? "SfProRounded" : undefined,
+                          },
+                        ]}
+                      >
+                        {MONTHS[viewMonth]} {viewYear}
+                      </Animated.Text>
+                      <Animated.View
+                        style={[
+                          styles.monthChevronWrap,
+                          monthChevronAnimatedStyle,
+                        ]}
+                      >
+                        <FontAwesome6
+                          name="chevron-right"
+                          color="#0a97fd"
+                          size={15}
+                        />
+                      </Animated.View>
+                    </Pressable>
+                  ) : (
+                    <Text
                       style={[
                         styles.monthLabel,
-                        textStylez,
                         {
                           fontFamily: fontLoaded ? "SfProRounded" : undefined,
+                          color: "#F2F2F7",
                         },
                       ]}
                     >
-                      {MONTHS[viewMonth]} {viewYear}
-                    </Animated.Text>
-                    <Animated.View
-                      style={[
-                        styles.monthChevronWrap,
-                        monthChevronAnimatedStyle,
-                      ]}
-                    >
-                      {/* <Ionicons
-                        color="#0a97fd"
-                        size={22}
-                        name="chevron-forward"
-                      /> */}
-                      <FontAwesome6
-                        name="chevron-right"
-                        color="#0a97fd"
-                        size={15}
-                      />
-                    </Animated.View>
-                  </Pressable>
+                      {pickerMode === "time" ? "Select Time" : "Time Selection"}
+                    </Text>
+                  )}
 
-                  <Animated.View style={[styles.navRow, navFadeStyle]}>
-                    <Pressable
-                      disabled={mode !== "calendar" || !canGoPrev}
-                      hitSlop={10}
-                      onPress={() => moveByMonth(-1)}
-                      style={({ pressed }) => [
-                        styles.navButton,
-                        pressed && styles.triggerPressed,
-                      ]}
-                    >
-                      <Ionicons
-                        color={canGoPrev ? "#F2F2F7" : "rgba(235,235,245,0.24)"}
-                        name="chevron-back"
-                        size={32}
-                      />
-                    </Pressable>
-                    <Pressable
-                      disabled={mode !== "calendar" || !canGoNext}
-                      hitSlop={10}
-                      onPress={() => moveByMonth(1)}
-                      style={({ pressed }) => [
-                        styles.navButton,
-                        pressed && styles.triggerPressed,
-                      ]}
-                    >
-                      <Ionicons
-                        color={canGoNext ? "#F2F2F7" : "rgba(235,235,245,0.24)"}
-                        name="chevron-forward"
-                        size={32}
-                      />
-                    </Pressable>
-                  </Animated.View>
+                  {currentTab === "date" && (
+                    <Animated.View style={[styles.navRow, navFadeStyle]}>
+                      <Pressable
+                        disabled={dateViewMode !== "calendar" || !canGoPrev}
+                        hitSlop={10}
+                        onPress={() => moveByMonth(-1)}
+                        style={({ pressed }) => [
+                          styles.navButton,
+                          pressed && styles.triggerPressed,
+                        ]}
+                      >
+                        <Ionicons
+                          color={canGoPrev ? "#F2F2F7" : "rgba(235,235,245,0.24)"}
+                          name="chevron-back"
+                          size={32}
+                        />
+                      </Pressable>
+                      <Pressable
+                        disabled={dateViewMode !== "calendar" || !canGoNext}
+                        hitSlop={10}
+                        onPress={() => moveByMonth(1)}
+                        style={({ pressed }) => [
+                          styles.navButton,
+                          pressed && styles.triggerPressed,
+                        ]}
+                      >
+                        <Ionicons
+                          color={canGoNext ? "#F2F2F7" : "rgba(235,235,245,0.24)"}
+                          name="chevron-forward"
+                          size={32}
+                        />
+                      </Pressable>
+                    </Animated.View>
+                  )}
                 </View>
+
+                {/* Segmented Control for Datetime Mode */}
+                {pickerMode === "datetime" && (
+                  <SegmentedControl
+                    values={["Date", "Time"]}
+                    selectedIndex={activeTab === "date" ? 0 : 1}
+                    onChange={(idx) => setActiveTab(idx === 0 ? "date" : "time")}
+                    fontLoaded={fontLoaded}
+                  />
+                )}
 
                 <Animated.View
                   style={[
@@ -616,144 +679,134 @@ export const DatePickerContent = memo<DatePickerContentProps>(
                     { height: stageHeight, marginTop: STAGE_GAP },
                   ]}
                 >
+                  {/* DATE TAB LAYER */}
                   <Animated.View
-                    pointerEvents={mode === "calendar" ? "auto" : "none"}
-                    style={[styles.calendarLayer, calendarFadeStyle]}
+                    pointerEvents={currentTab === "date" ? "auto" : "none"}
+                    style={[StyleSheet.absoluteFill, dateTabStyle]}
                   >
-                    <View style={[styles.weekdays, { height: WEEKDAY_HEIGHT }]}>
-                      {WEEKDAYS.map((label) => (
-                        <Text
-                          key={label}
-                          style={[
-                            styles.weekdayLabel,
-                            {
-                              fontFamily:
-                                fontLoaded ? "SfProRounded" : undefined,
-                            },
-                            { width: calendarColumnWidth },
-                          ]}
-                        >
-                          {label}
-                        </Text>
-                      ))}
-                    </View>
-                    <FlatList
-                      bounces={false}
-                      data={monthIndexes}
-                      decelerationRate={CALENDAR_DECELERATION_RATE}
-                      directionalLockEnabled
-                      getItemLayout={(_, index) => ({
-                        index,
-                        length: calendarPageWidth,
-                        offset: calendarPageWidth * index,
-                      })}
-                      horizontal
-                      initialNumToRender={4}
-                      initialScrollIndex={viewIndex}
-                      keyExtractor={(item) => String(item)}
-                      maxToRenderPerBatch={4}
-                      onLayout={handleCalendarLayout}
-                      onMomentumScrollEnd={handleCalendarMomentumEnd}
-                      onScrollEndDrag={handleCalendarScrollEndDrag}
-                      onScrollToIndexFailed={handleScrollToIndexFailed}
-                      pagingEnabled
-                      ref={calendarRef}
-                      renderItem={renderMonthItem}
-                      scrollEnabled={mode === "calendar"}
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.calendarPager}
-                      windowSize={6}
-                    />
-                  </Animated.View>
+                    <Animated.View
+                      pointerEvents={dateViewMode === "calendar" ? "auto" : "none"}
+                      style={[styles.calendarLayer, calendarFadeStyle]}
+                    >
+                      <View style={[styles.weekdays, { height: WEEKDAY_HEIGHT }]}>
+                        {WEEKDAYS.map((label) => (
+                          <Text
+                            key={label}
+                            style={[
+                              styles.weekdayLabel,
+                              {
+                                fontFamily:
+                                  fontLoaded ? "SfProRounded" : undefined,
+                              },
+                              { width: calendarColumnWidth },
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        ))}
+                      </View>
+                      <MonthPage
+                        fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                        month={viewMonth}
+                        onSelect={handleSelectDay}
+                        pageWidth={calendarPageWidth}
+                        selectedDay={
+                          value.month === viewMonth && value.year === viewYear ?
+                            value.day
+                          : null
+                        }
+                        year={viewYear}
+                      />
+                    </Animated.View>
 
-                  <Animated.View
-                    pointerEvents={mode === "wheel" ? "auto" : "none"}
-                    style={[
-                      styles.stageLayer,
-                      styles.wheelLayer,
-                      wheelFadeStyle,
-                    ]}
-                  >
-                    <View
+                    <Animated.View
+                      pointerEvents={dateViewMode === "wheel" ? "auto" : "none"}
                       style={[
-                        styles.wheelViewport,
-                        {
-                          height: stageHeight,
-                          width: wheelViewportWidth,
-                        },
+                        styles.stageLayer,
+                        styles.wheelLayer,
+                        wheelFadeStyle,
                       ]}
                     >
-                      <View style={[styles.wheelRow, { height: stageHeight }]}>
-                        <View
-                          style={[
-                            styles.wheelMonthCol,
-                            { width: wheelMonthColumnWidth },
-                          ]}
-                        >
-                          <WheelPicker
-                            fontFamily={fontLoaded ? "SfProRounded" : undefined}
-                            fontSize={Math.max(18, wheelItemHeight * 0.62)}
-                            horizontalPadding={20}
-                            itemHeight={wheelItemHeight}
-                            items={MONTHS_LOOPED}
-                            minimumFontScale={0.82}
-                            onIndexChange={handleWheelMonthChange}
-                            selectedIndex={monthWheelIndex}
-                            textAlign="left"
-                            visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
-                          />
-                        </View>
-                        <View
-                          style={[
-                            styles.wheelYearCol,
-                            {
-                              marginLeft: wheelColumnGap,
-                              width: wheelYearColumnWidth,
-                            },
-                          ]}
-                        >
-                          <WheelPicker
-                            fontFamily={fontLoaded ? "SfProRounded" : undefined}
-                            fontSize={Math.max(18, wheelItemHeight * 0.62)}
-                            horizontalPadding={20}
-                            itemHeight={wheelItemHeight}
-                            items={yearItems}
-                            onIndexChange={handleWheelYearChange}
-                            selectedIndex={Math.max(
-                              0,
-                              Math.min(
-                                viewYear - minYear,
-                                yearItems.length - 1,
-                              ),
-                            )}
-                            textAlign="right"
-                            visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
-                          />
-                        </View>
-                      </View>
-                      <LinearGradient
-                        colors={wheelOverlayColors as any}
-                        locations={wheelOverlayLocations as any}
-                        pointerEvents="none"
-                        style={styles.wheelFadeOverlay}
-                      />
                       <View
-                        pointerEvents="none"
                         style={[
-                          styles.wheelIndicatorWrap,
+                          styles.wheelViewport,
                           {
-                            marginTop: -wheelIndicatorHeight / 2,
-                            top: "50%",
+                            height: stageHeight,
+                            width: wheelViewportWidth,
                           },
                         ]}
                       >
+                        <View style={[styles.wheelRow, { height: stageHeight }]}>
+                          <View
+                            style={[
+                              styles.wheelMonthCol,
+                              { width: wheelMonthColumnWidth },
+                            ]}
+                          >
+                            <WheelPicker
+                              fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                              fontSize={Math.max(18, wheelItemHeight * 0.62)}
+                              horizontalPadding={20}
+                              itemHeight={wheelItemHeight}
+                              items={MONTHS_LOOPED}
+                              minimumFontScale={0.82}
+                              onIndexChange={handleWheelMonthChange}
+                              selectedIndex={monthWheelIndex}
+                              textAlign="left"
+                              visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
+                            />
+                          </View>
+                          <View
+                            style={[
+                              styles.wheelYearCol,
+                              {
+                                marginLeft: wheelColumnGap,
+                                width: wheelYearColumnWidth,
+                              },
+                            ]}
+                          >
+                            <WheelPicker
+                              fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                              fontSize={Math.max(18, wheelItemHeight * 0.62)}
+                              horizontalPadding={20}
+                              itemHeight={wheelItemHeight}
+                              items={yearItems}
+                              onIndexChange={handleWheelYearChange}
+                              selectedIndex={Math.max(
+                                0,
+                                Math.min(
+                                  viewYear - minYear,
+                                  yearItems.length - 1,
+                                ),
+                              )}
+                              textAlign="right"
+                              visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
+                            />
+                          </View>
+                        </View>
+                        <LinearGradient
+                          colors={wheelOverlayColors as any}
+                          locations={wheelOverlayLocations as any}
+                          pointerEvents="none"
+                          style={styles.wheelFadeOverlay}
+                        />
                         <View
+                          pointerEvents="none"
                           style={[
-                            styles.wheelIndicator,
+                            styles.wheelIndicatorWrap,
                             {
-                              borderRadius: wheelIndicatorHeight / 2,
-                              height: wheelIndicatorHeight,
-                              width: wheelViewportWidth,
+                              marginTop: -wheelIndicatorHeight / 2,
+                              top: "50%",
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.wheelIndicator,
+                              {
+                                borderRadius: wheelIndicatorHeight / 2,
+                                height: wheelIndicatorHeight,
+                                width: wheelViewportWidth,
                             },
                           ]}
                         />
@@ -761,13 +814,106 @@ export const DatePickerContent = memo<DatePickerContentProps>(
                     </View>
                   </Animated.View>
                 </Animated.View>
-              </View>
+
+                {/* TIME TAB LAYER */}
+                <Animated.View
+                  pointerEvents={currentTab === "time" ? "auto" : "none"}
+                  style={[StyleSheet.absoluteFill, timeTabStyle]}
+                >
+                  <View
+                    style={[
+                      styles.wheelViewport,
+                      {
+                        height: stageHeight,
+                        width: wheelViewportWidth,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.wheelRow, { height: stageHeight }]}>
+                      {/* Hour Column */}
+                      <View style={{ width: timeColumnWidth }}>
+                        <WheelPicker
+                          fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                          fontSize={Math.max(20, wheelItemHeight * 0.62)}
+                          horizontalPadding={12}
+                          itemHeight={wheelItemHeight}
+                          items={hours}
+                          onIndexChange={handleHourChange}
+                          selectedIndex={selectedHourIndex}
+                          textAlign={is24Hour ? "right" : "center"}
+                          visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
+                        />
+                      </View>
+
+                      {/* Minute Column */}
+                      <View style={{ width: timeColumnWidth }}>
+                        <WheelPicker
+                          fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                          fontSize={Math.max(20, wheelItemHeight * 0.62)}
+                          horizontalPadding={12}
+                          itemHeight={wheelItemHeight}
+                          items={minutesList}
+                          onIndexChange={handleMinuteChange}
+                          selectedIndex={selectedMinuteIndex}
+                          textAlign={is24Hour ? "left" : "center"}
+                          visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
+                        />
+                      </View>
+
+                      {/* AM/PM Column */}
+                      {!is24Hour && (
+                        <View style={{ width: timeColumnWidth }}>
+                          <WheelPicker
+                            fontFamily={fontLoaded ? "SfProRounded" : undefined}
+                            fontSize={Math.max(20, wheelItemHeight * 0.62)}
+                            horizontalPadding={12}
+                            itemHeight={wheelItemHeight}
+                            items={ampms}
+                            onIndexChange={handleAmpmChange}
+                            selectedIndex={selectedAmpmIndex}
+                            textAlign="left"
+                            visibleCount={DROPDOWN_WHEEL_VISIBLE_COUNT}
+                          />
+                        </View>
+                      )}
+                    </View>
+                    <LinearGradient
+                      colors={wheelOverlayColors as any}
+                      locations={wheelOverlayLocations as any}
+                      pointerEvents="none"
+                      style={styles.wheelFadeOverlay}
+                    />
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.wheelIndicatorWrap,
+                        {
+                          marginTop: -wheelIndicatorHeight / 2,
+                          top: "50%",
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.wheelIndicator,
+                          {
+                            borderRadius: wheelIndicatorHeight / 2,
+                            height: wheelIndicatorHeight,
+                            width: wheelViewportWidth,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </Animated.View>
+              </Animated.View>
             </View>
-          </Animated.View>
-        </GestureHandlerRootView>
-      </Modal>
-    );
-  },
+          </View>
+        </Animated.View>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+},
 );
 
 DatePickerContent.displayName = "DatePickerDropdown.Content";
@@ -891,5 +1037,36 @@ const styles = StyleSheet.create({
   },
   wheelYearCol: {
     flexShrink: 0,
+  },
+  segmentedContainer: {
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 9,
+    flexDirection: "row",
+    height: 34,
+    marginBottom: 8,
+    padding: 2,
+    position: "relative",
+    width: PANEL_INNER_WIDTH,
+  },
+  segmentedIndicator: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 7,
+    bottom: 2,
+    position: "absolute",
+    top: 2,
+  },
+  segmentedSegment: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  segmentedText: {
+    color: "rgba(235,235,245,0.6)",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  segmentedTextActive: {
+    color: "#FFFFFF",
   },
 });

@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { View } from "react-native";
 
+import { clampDateTime } from "./utils/calendar";
 import type {
   DatePickerContextValue,
   DatePickerRootProps,
@@ -28,33 +29,50 @@ export function DatePickerRoot({
   defaultOpen = false,
   maxYear = DEFAULT_MAX_YEAR,
   minYear = DEFAULT_MIN_YEAR,
+  minDate,
+  maxDate,
+  minTime,
+  maxTime,
+  mode = "date",
+  is24Hour = false,
   onChange,
   onOpenChange,
   open: openProp,
   value,
 }: DatePickerRootProps) {
   const today = useMemo(() => new Date(), []);
-  const [internalValue, setInternalValue] = useState<DateValue>(
-    () =>
-      defaultValue ?? {
-        day: today.getDate(),
-        month: today.getMonth(),
-        year: today.getFullYear(),
-      },
-  );
+  const [internalValue, setInternalValue] = useState<DateValue>(() => {
+    return {
+      day: defaultValue?.day ?? today.getDate(),
+      month: defaultValue?.month ?? today.getMonth(),
+      year: defaultValue?.year ?? today.getFullYear(),
+      hour: defaultValue?.hour ?? today.getHours(),
+      minute: defaultValue?.minute ?? today.getMinutes(),
+    };
+  });
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [triggerRect, setTriggerRect] = useState<TriggerRect | null>(null);
   const triggerRef = useRef<View | null>(null);
 
-  const currentValue = value ?? internalValue;
+  const currentValue = useMemo(() => {
+    const val = value ?? internalValue;
+    return {
+      day: val.day,
+      month: val.month,
+      year: val.year,
+      hour: val.hour ?? today.getHours(),
+      minute: val.minute ?? today.getMinutes(),
+    };
+  }, [value, internalValue, today]);
   const open = openProp ?? internalOpen;
 
   const setValue = useCallback(
     (next: DateValue) => {
-      if (value === undefined) setInternalValue(next);
-      onChange?.(next);
+      const clamped = clampDateTime(next, minDate, maxDate, minTime, maxTime);
+      if (value === undefined) setInternalValue(clamped);
+      onChange?.(clamped);
     },
-    [onChange, value],
+    [onChange, value, minDate, maxDate, minTime, maxTime],
   );
 
   const setOpen = useCallback(
@@ -85,14 +103,10 @@ export function DatePickerRoot({
       return;
     }
 
-    const node = triggerRef.current;
-    if (!node) {
-      setOpen(true);
-      return;
-    }
+    setOpen(true);
 
-    measureTrigger(() => {
-      setOpen(true);
+    requestAnimationFrame(() => {
+      measureTrigger();
     });
   }, [measureTrigger, open, setOpen]);
 
@@ -101,6 +115,12 @@ export function DatePickerRoot({
       maxYear,
       measureTrigger,
       minYear,
+      minDate,
+      maxDate,
+      minTime,
+      maxTime,
+      mode,
+      is24Hour,
       open,
       setOpen,
       setValue,
@@ -114,6 +134,12 @@ export function DatePickerRoot({
       maxYear,
       measureTrigger,
       minYear,
+      minDate,
+      maxDate,
+      minTime,
+      maxTime,
+      mode,
+      is24Hour,
       open,
       setOpen,
       setValue,

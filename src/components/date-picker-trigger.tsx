@@ -10,18 +10,28 @@ import Animated, {
 } from "react-native-reanimated";
 import { SquircleView } from "~/squircle";
 import { useDatePickerContext } from "../hooks/use-date-picker-context";
-import { formatTriggerLabel } from "../utils/date-format";
+import { formatTriggerLabel, formatDateTime } from "../utils/date-format";
 
 export const DatePickerTrigger = memo<DatePickerTriggerProps>(
   ({ children, hitSlop = 8, style }) => {
     const progress = useSharedValue<number>(0);
-    const { triggerRef, toggle, value, open } = useDatePickerContext();
+    const { triggerRef, toggle, value, open, mode, is24Hour, measureTrigger } = useDatePickerContext();
     const [fontLoaded] = useFonts({
       SfProRounded: require("@/assets/fonts/sf-pro-rounded.otf"),
     });
     useEffect(() => {
       progress.value = open ? 1 : 0;
     }, [open]);
+
+    const formattedLabel = React.useMemo(() => {
+      if (mode === "time") {
+        return formatDateTime(value, is24Hour ? "HH:mm" : "hh:mm A");
+      }
+      if (mode === "datetime") {
+        return formatDateTime(value, is24Hour ? "DD MMM YYYY, HH:mm" : "DD MMM YYYY, hh:mm A");
+      }
+      return formatTriggerLabel(value);
+    }, [value, mode, is24Hour]);
 
     const animatedTextStylez = useAnimatedStyle<Pick<TextStyle, "color">>(
       () => {
@@ -47,6 +57,9 @@ export const DatePickerTrigger = memo<DatePickerTriggerProps>(
           <View
             ref={triggerRef}
             collapsable={false}
+            onLayout={() => {
+              measureTrigger();
+            }}
             style={styles.triggerContent}
           >
             {children ?? (
@@ -64,7 +77,7 @@ export const DatePickerTrigger = memo<DatePickerTriggerProps>(
                     animatedTextStylez,
                   ]}
                 >
-                  {formatTriggerLabel(value)}
+                  {formattedLabel}
                 </Animated.Text>
               </SquircleView>
             )}

@@ -21,3 +21,4 @@ export type {
   DatePickerProps,
 } from "./types/date-picker";
 export type { Align, Side } from "./types/positioning";
+export { formatDateTime } from "./utils/date-format";
